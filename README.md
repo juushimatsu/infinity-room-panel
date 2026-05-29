@@ -1,5 +1,10 @@
 # AudioBot Panel
 
+> ### ОШИБКА: НЕ ИДЕТ ТРАФИК.
+> Требуются исправления со стороны olcrtc. 
+> Вскоре будет исправлено в [Olcrtc_manager](https://github.com/Oleglog/Olcrtc_manager)
+> Панель не совместима с [openlibrecommunity/olcrtc](https://github.com/openlibrecommunity/olcrtc)
+
 Веб-панель для управления аудио-ботами в видеоконференциях Jitsi, Яндекс Телемост и WB Stream. Боты подключаются к комнате как участники и воспроизводят загруженное аудио (MP3 → Opus) через WebRTC.
 
 ## Архитектура
