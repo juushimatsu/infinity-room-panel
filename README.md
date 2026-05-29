@@ -34,12 +34,10 @@ infinity-room-panel/
 - `session-accept` отправляет пустой `<transport>` без ICE-credentials (ufrag, pwd, fingerprint) и кандидатов — Jicofo не может установить WebRTC-соединение
 - Бот не отправляет свои ICE candidates обратно через `transport-info` — нет `OnICECandidate` callback
 - Парсинг `transport-info` неполный — поддерживается только Harmony-формат
-- Подробный анализ: [`AUDIO_FIX_PLAN.md`](AUDIO_FIX_PLAN.md)
 
 **Телемост** — боты не воспроизводят аудио:
 - PlanB SDP семантика — исправлена (SDPSemanticsPlanB), но остаются проблемы с SDP answer и ICE negotiation
 - `capabilitiesOffer` была неполной — расширена (добавлены `offerAnswerMode`, `slotsMode`, etc.), но нужна проверка
-- Подробный анализ: [`AUDIO_FIX_PLAN.md`](AUDIO_FIX_PLAN.md)
 
 ## Быстрый старт
 
