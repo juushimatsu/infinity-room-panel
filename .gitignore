@@ -399,3 +399,15 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# Temp files
+temp/
+
+# Design
+DESIGN.md
+
+# Claude
+CLAUDE.md
+
+# ТЗ
+ТЗ_AudioBot_Panel.md
