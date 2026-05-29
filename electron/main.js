@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require("electron");
+const { app, BrowserWindow, dialog } = require("electron");
 const path = require("path");
 const { spawn } = require("child_process");
 const fs = require("fs");
@@ -8,6 +8,18 @@ let backendProcess = null;
 
 // Project root is one level up from electron/ directory
 const projectRoot = path.resolve(path.join(__dirname, ".."));
+
+// Disable GPU rendering — Mali-G31 with panfrost is unstable; software render is reliable for static UI
+app.disableHardwareAcceleration();
+
+// Unused features that waste memory/processes on embedded hardware
+app.commandLine.appendSwitch(
+  "disable-features",
+  "Translate,CalculateNativeWinOcclusion,MediaSessionService,HardwareMediaKeyHandling",
+);
+// Keep renderer and timers active when window is backgrounded — needed for WebSocket live-updates
+app.commandLine.appendSwitch("disable-renderer-backgrounding");
+app.commandLine.appendSwitch("disable-background-timer-throttling");
 
 function findBinaryPath() {
   const binaryName =
@@ -30,7 +42,6 @@ function findBinaryPath() {
 async function startBackend() {
   const binaryPath = findBinaryPath();
   if (!binaryPath) {
-    const { dialog } = require("electron");
     dialog.showErrorBox(
       "Backend not found",
       `Could not find the Go backend binary at:\n${path.join(projectRoot, "backend", "audiobot-panel.exe")}\n\nPlease build it first:\ngo build -o backend/audiobot-panel.exe ./backend/`,
@@ -39,7 +50,7 @@ async function startBackend() {
     return null;
   }
 
-  // Find a free port
+  // Find a free port — single syscall, negligible cost; avoids port conflicts on crash/restart
   const net = require("net");
   const server = net.createServer();
   await new Promise((resolve) => {
@@ -62,10 +73,13 @@ async function startBackend() {
     stdio: ["pipe", "pipe", "pipe"],
   });
 
+  let portConfirmed = false;
+
   backendProcess.stdout.on("data", (data) => {
     const str = data.toString();
     console.log("[backend]", str.trim());
-    if (str.includes("PORT=")) {
+    if (!portConfirmed && str.includes("PORT=")) {
+      portConfirmed = true;
       createWindow(port);
     }
   });
@@ -82,12 +96,17 @@ async function startBackend() {
     console.log(`Backend exited with code ${code}`);
   });
 
-  // Fallback: create window after timeout
+  // Honest timeout: if backend doesn't print PORT= within 10s, it's stuck.
+  // 10s accounts for eMMC/microSD I/O on ARM + first-run bcrypt init.
   setTimeout(() => {
-    if (!mainWindow) {
-      createWindow(port);
+    if (!portConfirmed) {
+      dialog.showErrorBox(
+        "Backend failed to start",
+        "The backend process did not signal readiness within 10 seconds. Check logs for errors.",
+      );
+      app.quit();
     }
-  }, 3000);
+  }, 10000);
 
   return port;
 }
@@ -99,14 +118,22 @@ function createWindow(port) {
     width: 900,
     height: 750,
     title: "AudioBot Panel",
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,
       contextIsolation: true,
+      spellcheck: false,
+      backgroundThrottling: true,
+      devTools: !app.isPackaged,
     },
   });
 
   mainWindow.loadURL(`http://localhost:${port}`);
+
+  mainWindow.once("ready-to-show", () => {
+    mainWindow.show();
+  });
 
   mainWindow.on("closed", () => {
     mainWindow = null;

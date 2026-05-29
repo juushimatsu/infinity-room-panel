@@ -5,6 +5,7 @@
 - [Требования](#требования)
 - [Развертывание на Windows](#развертывание-на-windows)
 - [Развертывание на Linux](#развертывание-на-linux)
+- [Развертывание на слабых ARM-устройствах](#развертывание-на-слабых-arm-устройствах)
 - [Запуск веб-версии](#запуск-веб-версии)
 - [Запуск Electron-приложения](#запуск-electron-приложения)
 - [Установка ffmpeg](#установка-ffmpeg)
@@ -182,6 +183,115 @@ go build -o backend/audiobot-panel ./backend/
 ### 5. Запустите
 
 См. раздел [Запуск веб-версии](#запуск-веб-версии) ниже.
+
+---
+
+## Развертывание на слабых ARM-устройствах
+
+> Для одноплатных компьютеров на ARM64 (Orange Pi, Raspberry Pi 4/5 и т.п.) с 1–4 ГБ RAM, eMMC/microSD. Примеры: Orange Pi Zero 2W (H618), Raspberry Pi 4 (BCM2711). ОС: Armbian/Ubuntu Server arm64.
+
+### 1. Установите зависимости
+
+**Go (arm64):**
+```bash
+wget https://go.dev/dl/go1.22.0.linux-arm64.tar.gz
+sudo tar -C /usr/local -xzf go1.22.0.linux-arm64.tar.gz
+export PATH=$PATH:/usr/local/go/bin
+go version
+```
+
+**Node.js LTS (arm64):**
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+node --version
+npm --version
+```
+
+**ffmpeg:**
+```bash
+sudo apt update && sudo apt install -y ffmpeg
+ffmpeg -version
+```
+
+**Системные библиотеки для Electron:**
+```bash
+sudo apt install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2
+```
+
+### 2. Клонируйте репозиторий
+
+```bash
+cd ~
+git clone <repo-url> infinity-room-panel
+cd infinity-room-panel
+```
+
+### 3. Соберите фронтенд
+
+```bash
+cd frontend
+npm install --legacy-peer-deps
+npm run build
+cd ..
+```
+
+Сборка создаёт `frontend/build/` с предзжатыми `.gz`/`.br` версиями статики. Source maps не генерируются.
+
+### 4. Кросс-сборка бэкенда (arm64)
+
+Сборка **на самом устройстве** (не кросс-компиляция с другой машины):
+```bash
+GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o backend/audiobot-panel ./backend/
+```
+
+- `-trimpath` убирает пути исходников из бинарника.
+- `-ldflags="-s -w"` strip-ит debug-символы и DWARF, уменьшая размер ~20%.
+- **Не используйте UPX** — декомпрессия на Cortex-A53 удлиняет старт вместо ускорения.
+
+### 5. Установите Electron (arm64)
+
+```bash
+cd electron
+npm install --arch=arm64
+cd ..
+```
+
+> `node_modules` с Windows-машины **не совместимы** с arm64. Всегда выполняйте `npm install` на устройстве.
+
+### 6. Запустите Electron-приложение
+
+```bash
+cd electron
+npm start
+```
+
+Если Electron падает с ошибкой `The SUID sandbox helper binary was not found` или `running as root without --no-sandbox`, установите suid-бит на chrome-sandbox:
+
+```bash
+# Найдите chrome-sandbox в node_modules/electron
+electron_sandbox="$(find electron/node_modules/electron -name chrome-sandbox | head -1)"
+if [ -n "$electron_sandbox" ]; then
+  sudo chown root "$electron_sandbox"
+  sudo chmod 4755 "$electron_sandbox"
+fi
+```
+
+После этого `npm start` запустится без `--no-sandbox`. **Не добавляйте `--no-sandbox` в скрипт по умолчанию** — это снижает безопасность.
+
+Если suid-бит не помог или вы запускаете от root, добавьте `--no-sandbox` одноразово:
+```bash
+cd electron
+npx electron . --no-sandbox
+```
+
+### 7. (Альтернатива) Запуск без Electron — веб-версия
+
+Если Electron не нужен (headless, без монитора), запустите только бэкенд:
+```bash
+./backend/audiobot-panel
+# Откройте http://<ip-устройства>:8080 в браузере на другой машине
+```
 
 ---
 

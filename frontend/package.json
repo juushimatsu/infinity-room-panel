@@ -10,13 +10,12 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build"
+    "build": "cross-env GENERATE_SOURCEMAP=false react-scripts build",
+    "postbuild": "node compress-assets.js"
   },
   "browserslist": {
     "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
+      "last 1 chrome version"
     ],
     "development": [
       "last 1 chrome version",
@@ -26,6 +25,7 @@
   "devDependencies": {
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
-    "ajv": "^8.20.0"
+    "ajv": "^8.20.0",
+    "cross-env": "^10.1.0"
   }
 }

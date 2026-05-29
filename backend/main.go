@@ -77,6 +77,53 @@ func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.fileServer.ServeHTTP(w, r)
 }
 
+// compressedFileHandler serves pre-compressed .gz/.br files when the client
+// sends Accept-Encoding. Falls back to the original handler otherwise.
+type compressedFileHandler struct {
+	handler   http.Handler
+	staticDir string
+}
+
+func (h compressedFileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	accept := r.Header.Get("Accept-Encoding")
+	if (strings.Contains(accept, "br") || strings.Contains(accept, "gzip")) && h.staticDir != "" {
+		cleanPath := filepath.Clean(r.URL.Path)
+		fsBase := filepath.Clean(h.staticDir)
+		for _, enc := range []struct {
+			ext    string
+			header string
+		}{
+			{"br", "br"},
+			{"gz", "gzip"},
+		} {
+			if !strings.Contains(accept, enc.header) {
+				continue
+			}
+			fsPath := filepath.Join(h.staticDir, cleanPath+"."+enc.ext)
+			// Prevent path traversal
+			if !strings.HasPrefix(filepath.Clean(fsPath), fsBase) {
+				continue
+			}
+			f, err := os.Open(fsPath)
+			if err != nil {
+				continue
+			}
+			defer f.Close()
+			stat, err := f.Stat()
+			if err != nil {
+				continue
+			}
+			w.Header().Set("Content-Encoding", enc.header)
+			w.Header().Set("Vary", "Accept-Encoding")
+			// ServeContent uses the name param for Content-Type detection,
+			// so passing the original filename gives correct MIME type (e.g. text/css).
+			http.ServeContent(w, r, filepath.Base(cleanPath), stat.ModTime(), f)
+			return
+		}
+	}
+	h.handler.ServeHTTP(w, r)
+}
+
 func main() {
 	projectRoot := findProjectRoot()
 	log.Printf("Project root: %s", projectRoot)
@@ -134,7 +181,8 @@ func main() {
 			staticDir:  frontendPath,
 			fileServer: http.FileServer(http.Dir(frontendPath)),
 		}
-		r.PathPrefix("/").Handler(spa)
+		compressed := compressedFileHandler{handler: spa, staticDir: frontendPath}
+		r.PathPrefix("/").Handler(compressed)
 	} else {
 		log.Printf("WARNING: frontend build not found at %s", frontendPath)
 	}
