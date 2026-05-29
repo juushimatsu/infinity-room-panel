@@ -1,4 +1,3 @@
-import React from 'react';
 import { BotStatus } from '../api/client';
 
 interface BotStatusCardProps {
@@ -33,7 +32,7 @@ function getInitials(name: string): string {
   return name.substring(0, 2).toUpperCase();
 }
 
-const BotStatusCard: React.FC<BotStatusCardProps> = ({ bots }) => {
+function BotStatusCard({ bots }: BotStatusCardProps) {
   if (bots.length === 0) {
     return (
       <div className="section">
@@ -64,6 +63,6 @@ const BotStatusCard: React.FC<BotStatusCardProps> = ({ bots }) => {
       </div>
     </div>
   );
-};
+}
 
 export default BotStatusCard;

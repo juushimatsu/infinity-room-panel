@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import NewRoomForm from "./components/NewRoomForm";
 import RoomCard from "./components/RoomCard";
 import AudioUpload from "./components/AudioUpload";

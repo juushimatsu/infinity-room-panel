@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "preact/hooks";
 import ServiceSelector from "./ServiceSelector";
 import RoomInput from "./RoomInput";
 import BotConfig from "./BotConfig";
@@ -18,12 +18,12 @@ interface NewRoomFormProps {
   onCancel: () => void;
 }
 
-const NewRoomForm: React.FC<NewRoomFormProps> = ({
+function NewRoomForm({
   files,
   onUpload,
   onStart,
   onCancel,
-}) => {
+}: NewRoomFormProps) {
   const [service, setService] = useState<"jitsi" | "telemost" | "wbstream">(
     "jitsi",
   );
@@ -91,6 +91,6 @@ const NewRoomForm: React.FC<NewRoomFormProps> = ({
       </div>
     </div>
   );
-};
+}
 
 export default NewRoomForm;

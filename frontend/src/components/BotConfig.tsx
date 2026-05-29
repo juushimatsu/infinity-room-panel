@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface BotConfigProps {
   botCount: number;
   loop: boolean;
@@ -7,7 +5,7 @@ interface BotConfigProps {
   onLoopChange: (loop: boolean) => void;
 }
 
-const BotConfig: React.FC<BotConfigProps> = ({ botCount, loop, onBotCountChange, onLoopChange }) => {
+function BotConfig({ botCount, loop, onBotCountChange, onLoopChange }: BotConfigProps) {
   return (
     <div className="section">
       <label className="section-label">Параметры ботов</label>
@@ -21,8 +19,8 @@ const BotConfig: React.FC<BotConfigProps> = ({ botCount, loop, onBotCountChange,
               min={1}
               max={3}
               value={botCount}
-              onChange={(e) => {
-                const v = parseInt(e.target.value, 10);
+              onInput={(e) => {
+                const v = parseInt((e.target as HTMLInputElement).value, 10);
                 if (v >= 1 && v <= 3) onBotCountChange(v);
               }}
             />
@@ -32,7 +30,7 @@ const BotConfig: React.FC<BotConfigProps> = ({ botCount, loop, onBotCountChange,
               <input
                 type="checkbox"
                 checked={loop}
-                onChange={(e) => onLoopChange(e.target.checked)}
+                onChange={(e) => onLoopChange((e.target as HTMLInputElement).checked)}
               />
               <span className="toggle-slider" />
             </label>
@@ -42,6 +40,6 @@ const BotConfig: React.FC<BotConfigProps> = ({ botCount, loop, onBotCountChange,
       </div>
     </div>
   );
-};
+}
 
 export default BotConfig;

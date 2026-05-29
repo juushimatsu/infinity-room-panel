@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'preact/hooks';
+import { JSX } from 'preact';
 import { AudioFile, uploadAudio } from '../api/client';
 
 interface AudioUploadProps {
@@ -14,7 +15,7 @@ function formatSize(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-const AudioUpload: React.FC<AudioUploadProps> = ({ selectedFileId, files, onFileSelect, onUpload }) => {
+function AudioUpload({ selectedFileId, files, onFileSelect, onUpload }: AudioUploadProps) {
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -40,17 +41,18 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ selectedFileId, files, onFile
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = (e: JSX.TargetedDragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragOver(false);
-    const file = e.dataTransfer.files[0];
+    const file = e.dataTransfer?.files[0];
     if (file) handleFile(file);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleInputChange = (e: JSX.TargetedEvent<HTMLInputElement, Event>) => {
+    const target = e.target as HTMLInputElement;
+    const file = target.files?.[0];
     if (file) handleFile(file);
-    e.target.value = '';
+    target.value = '';
   };
 
   return (
@@ -91,6 +93,6 @@ const AudioUpload: React.FC<AudioUploadProps> = ({ selectedFileId, files, onFile
       )}
     </div>
   );
-};
+}
 
 export default AudioUpload;

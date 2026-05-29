@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface RoomInputProps {
   service: 'jitsi' | 'telemost' | 'wbstream';
   value: string;
@@ -18,7 +16,7 @@ const labels: Record<string, string> = {
   wbstream: 'UUID комнаты',
 };
 
-const RoomInput: React.FC<RoomInputProps> = ({ service, value, onChange }) => {
+function RoomInput({ service, value, onChange }: RoomInputProps) {
   return (
     <div className="section">
       <label className="section-label">{labels[service]}</label>
@@ -27,10 +25,10 @@ const RoomInput: React.FC<RoomInputProps> = ({ service, value, onChange }) => {
         className="text-input"
         placeholder={placeholders[service]}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onInput={(e) => onChange((e.target as HTMLInputElement).value)}
       />
     </div>
   );
-};
+}
 
 export default RoomInput;

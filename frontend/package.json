@@ -2,30 +2,20 @@
   "name": "audiobot-panel",
   "version": "1.0.0",
   "private": true,
-  "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-scripts": "5.0.1",
-    "typescript": "^4.9.5"
-  },
+  "type": "module",
   "scripts": {
-    "start": "react-scripts start",
-    "build": "cross-env GENERATE_SOURCEMAP=false react-scripts build",
-    "postbuild": "node compress-assets.js"
+    "dev": "vite",
+    "build": "vite build",
+    "postbuild": "node compress-assets.cjs",
+    "preview": "vite preview"
   },
-  "browserslist": {
-    "production": [
-      "last 1 chrome version"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version"
-    ]
+  "dependencies": {
+    "preact": "^10.25.0"
   },
   "devDependencies": {
-    "@types/react": "^19.2.15",
-    "@types/react-dom": "^19.2.3",
-    "ajv": "^8.20.0",
-    "cross-env": "^10.1.0"
+    "@preact/preset-vite": "^2.10.0",
+    "terser": "^5.36.0",
+    "typescript": "^5.8.0",
+    "vite": "^6.3.0"
   }
 }

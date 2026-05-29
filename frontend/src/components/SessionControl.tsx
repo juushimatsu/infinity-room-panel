@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface SessionControlProps {
   canStart: boolean;
   sessionActive: boolean;
@@ -7,7 +5,7 @@ interface SessionControlProps {
   onStop: () => void;
 }
 
-const SessionControl: React.FC<SessionControlProps> = ({ canStart, sessionActive, onStart, onStop }) => {
+function SessionControl({ canStart, sessionActive, onStart, onStop }: SessionControlProps) {
   return (
     <div className="section">
       <div className="session-controls">
@@ -30,6 +28,6 @@ const SessionControl: React.FC<SessionControlProps> = ({ canStart, sessionActive
       </div>
     </div>
   );
-};
+}
 
 export default SessionControl;

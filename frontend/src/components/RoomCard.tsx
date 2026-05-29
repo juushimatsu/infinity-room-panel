@@ -1,4 +1,3 @@
-import React from "react";
 import { RoomInfo, BotStatus } from "../api/client";
 
 const serviceLabels: Record<string, string> = {
@@ -40,7 +39,7 @@ interface RoomCardProps {
   onStop: () => void;
 }
 
-const RoomCard: React.FC<RoomCardProps> = ({ room, onStop }) => {
+const RoomCard = ({ room, onStop }: RoomCardProps) => {
   const activeBots = room.bots.filter(
     (b) => b.status === "active" || b.status === "connecting",
   );

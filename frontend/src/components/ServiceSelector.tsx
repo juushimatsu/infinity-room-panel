@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface ServiceSelectorProps {
   value: 'jitsi' | 'telemost' | 'wbstream';
   onChange: (service: 'jitsi' | 'telemost' | 'wbstream') => void;
@@ -11,7 +9,7 @@ const services: { key: 'jitsi' | 'telemost' | 'wbstream'; label: string }[] = [
   { key: 'wbstream', label: 'WB Stream' },
 ];
 
-const ServiceSelector: React.FC<ServiceSelectorProps> = ({ value, onChange }) => {
+function ServiceSelector({ value, onChange }: ServiceSelectorProps) {
   return (
     <div className="service-selector">
       {services.map((s) => (
@@ -26,6 +24,6 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({ value, onChange }) =>
       ))}
     </div>
   );
-};
+}
 
 export default ServiceSelector;

@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
-import { login } from '../api/client';
+import { useState } from "preact/hooks";
+import { JSX } from "preact";
+import { login } from "../api/client";
 
 interface LoginPageProps {
   onLogin: () => void;
 }
 
-const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
+function LoginPage({ onLogin }: LoginPageProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: JSX.TargetedEvent<HTMLFormElement, Event>) => {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -36,7 +37,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             className="text-input"
             placeholder="Пароль"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
             autoFocus
           />
           <button
@@ -50,6 +51,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       </div>
     </div>
   );
-};
+}
 
 export default LoginPage;
