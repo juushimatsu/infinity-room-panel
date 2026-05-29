@@ -60,6 +60,9 @@ for TARGET in "${TARGETS[@]}"; do
   DIST_NAME="audiobot-panel-${OS}-${ARCH}"
   DIST_PATH="$DIST_DIR/$DIST_NAME"
 
+  SUFFIX=""
+  [ "$OS" = "windows" ] && SUFFIX=".exe"
+
   # electron-packager naming: amd64 -> x64, windows -> win32
   EARCH="$ARCH"
   [ "$ARCH" = "amd64" ] && EARCH="x64"
@@ -76,7 +79,25 @@ for TARGET in "${TARGETS[@]}"; do
     --app-version="$NUMERIC_VERSION" \
     --name="audiobot-panel-electron" \
     --executable-name="audiobot-panel-electron" \
-    || echo "  WARNING: electron-packager failed for $OS/$ARCH (binary still ships)"
+    || { echo "  WARNING: electron-packager failed for $OS/$ARCH (binary still ships)"; continue; }
+
+  # electron-packager creates a single subdir like audiobot-panel-electron-<EOS>-<EARCH>/
+  # Copy backend binary + frontend/build into that app's resources/ so Electron finds them
+  # (electron/main.js looks for backend at process.resourcesPath/backend/<binary>
+  #  and Go backend resolves frontend at <projectRoot>/frontend/build where projectRoot = resources dir)
+  INNER_APP="$(find "$DIST_PATH/electron-app" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  if [ -z "$INNER_APP" ] || [ ! -d "$INNER_APP/resources" ]; then
+    echo "  WARNING: could not locate Electron app resources/ for $OS/$ARCH"
+    continue
+  fi
+
+  mkdir -p "$INNER_APP/resources/backend"
+  cp "$DIST_PATH/audiobot-panel${SUFFIX}" "$INNER_APP/resources/backend/audiobot-panel${SUFFIX}"
+  cp -r "$PROJECT_ROOT/frontend/build" "$INNER_APP/resources/frontend-build-tmp"
+  rm -rf "$INNER_APP/resources/frontend"
+  mkdir -p "$INNER_APP/resources/frontend"
+  mv "$INNER_APP/resources/frontend-build-tmp" "$INNER_APP/resources/frontend/build"
+  echo "    backend + frontend embedded in $INNER_APP"
 done
 
 cd "$PROJECT_ROOT"
