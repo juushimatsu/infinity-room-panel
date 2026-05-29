@@ -99,6 +99,20 @@ func InitAuth(configDir string, isElectron bool) (*AuthConfig, error) {
 
 	cfg, err := LoadAuthConfig(configDir)
 	if err == nil && cfg != nil {
+		// If running in web mode but config was created by Electron (empty password),
+		// generate a password so the user can log in.
+		if !isElectron && cfg.HashedPassword == "" {
+			password := GeneratePassword(16)
+			hash, err := HashPassword(password)
+			if err != nil {
+				return nil, err
+			}
+			cfg.HashedPassword = hash
+			if err := SaveAuthConfig(configDir, cfg.HashedPassword, cfg.JWTSecret); err != nil {
+				return nil, err
+			}
+			fmt.Printf("\n=== Сгенерированный пароль для входа: %s ===\n\n", password)
+		}
 		return cfg, nil
 	}
 
