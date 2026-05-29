@@ -149,6 +149,61 @@ func (m *BotManager) StopRoom(roomID string) error {
 	return nil
 }
 
+// PauseRoom disconnects all bots in a room but keeps the room entry
+// so it can be resumed later.
+func (m *BotManager) PauseRoom(roomID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	room, ok := m.rooms[roomID]
+	if !ok {
+		return fmt.Errorf("room not found: %s", roomID)
+	}
+
+	if !room.Active {
+		return fmt.Errorf("room already paused: %s", roomID)
+	}
+
+	for _, bot := range room.Bots {
+		if bot.cancelFunc != nil {
+			bot.cancelFunc()
+		}
+		bot.info.Status = StatusStopped
+		m.emitStatus(bot.info.ID, bot.info.Name, StatusStopped, "", roomID)
+	}
+
+	room.Active = false
+	return nil
+}
+
+// ResumeRoom reconnects all bots in a paused room.
+func (m *BotManager) ResumeRoom(roomID string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	room, ok := m.rooms[roomID]
+	if !ok {
+		return fmt.Errorf("room not found: %s", roomID)
+	}
+
+	if room.Active {
+		return fmt.Errorf("room already active: %s", roomID)
+	}
+
+	room.Active = true
+	frames := room.opusFrames
+
+	for i, bot := range room.Bots {
+		ctx, cancel := context.WithCancel(context.Background())
+		bot.cancelFunc = cancel
+		bot.info.Status = StatusConnecting
+
+		go m.runBot(ctx, roomID, i, bot.info.Name, room.Service, room.RoomInput, true, frames)
+	}
+
+	return nil
+}
+
 // StopAll stops all rooms.
 func (m *BotManager) StopAll() error {
 	m.mu.Lock()

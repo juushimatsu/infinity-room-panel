@@ -185,6 +185,60 @@ func (s *Server) HandleRoomStop(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "stopped"})
 }
 
+func (s *Server) HandleRoomPause(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	var req struct {
+		RoomID string `json:"room_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+
+	if req.RoomID == "" {
+		writeError(w, http.StatusBadRequest, "room_id is required")
+		return
+	}
+
+	if err := s.manager.PauseRoom(req.RoomID); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "paused"})
+}
+
+func (s *Server) HandleRoomResume(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	var req struct {
+		RoomID string `json:"room_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+
+	if req.RoomID == "" {
+		writeError(w, http.StatusBadRequest, "room_id is required")
+		return
+	}
+
+	if err := s.manager.ResumeRoom(req.RoomID); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "resumed"})
+}
+
 func (s *Server) HandleRoomsList(w http.ResponseWriter, r *http.Request) {
 	rooms := s.manager.GetRooms()
 	writeJSON(w, http.StatusOK, rooms)

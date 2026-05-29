@@ -86,7 +86,7 @@ func EncodePCMToOpusFrames(pcmData []int16) ([][]byte, error) {
 		"-ac", "1",
 		"-i", tmpPCMPath,
 		"-c:a", "libopus",
-		"-b:a", "64k",
+		"-b:a", "24k",
 		"-vbr", "off",
 		"-frame_duration", "20",
 		"-application", "voip",

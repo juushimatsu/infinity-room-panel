@@ -3,11 +3,9 @@
 ## Содержание
 
 - [Требования](#требования)
-- [Развертывание на Windows](#развертывание-на-windows)
-- [Развертывание на Linux](#развертывание-на-linux)
-- [Развертывание на слабых ARM-устройствах](#развертывание-на-слабых-arm-устройствах)
-- [Запуск веб-версии](#запуск-веб-версии)
-- [Запуск Electron-приложения](#запуск-electron-приложения)
+- [Установка из релиза (рекомендуется)](#установка-из-релиза-рекомендуется)
+- [Сборка из исходников](#сборка-из-исходников)
+- [Запуск](#запуск)
 - [Установка ffmpeg](#установка-ffmpeg)
 - [Конфигурация](#конфигурация)
 - [API-эндпоинты](#api-эндпоинты)
@@ -19,285 +17,157 @@
 
 | Компонент | Версия | Назначение |
 |---|---|---|
-| Go | 1.22+ | Сборка бэкенда |
-| Node.js | 20+ | Сборка фронтенда |
-| npm | 10+ | Управление зависимостями фронтенда |
 | ffmpeg | любой | Декодирование MP3 → Opus |
-| Git | любой | Клонирование репозитория |
+
+Дополнительные требования зависят от способа установки:
+
+| Способ | Доп. требования |
+|---|---|
+| Electron (десктоп) | — (всё включено в архив) |
+| Headless (только бэкенд) | — |
+| Сборка из исходников | Go 1.25+, Node.js 20+, npm 10+, Git |
 
 ---
 
-## Развертывание на Windows
+## Установка из релиза (рекомендуется)
 
-### 1. Установите зависимости
+Скачайте архив для вашей платформы со [страницы релизов](https://github.com/juushimatsu/infinity-room-panel/releases).
 
-**Go:**
-```powershell
-# Через winget
-winget install GoLang.Go
-
-# Или скачайте с https://go.dev/dl/
-# Проверка:
-go version
-```
-
-**Node.js:**
-```powershell
-# Через winget
-winget install OpenJS.NodeJS.LTS
-
-# Или скачайте с https://nodejs.org/
-# Проверка:
-node --version
-npm --version
-```
-
-**ffmpeg:**
-```powershell
-# Через winget (рекомендуется)
-winget install Gyan.FFmpeg
-
-# Через Chocolatey
-choco install ffmpeg
-
-# Вручную:
-# 1. Скачайте с https://www.gyan.dev/ffmpeg/builds/ → ffmpeg-release-essentials.zip
-# 2. Распакуйте, например, в C:\ffmpeg
-# 3. Добавьте C:\ffmpeg\bin в PATH:
-#    - Win → "environment" → "Edit the system environment variables"
-#    - "Environment Variables" → System variables → Path → Edit → New → C:\ffmpeg\bin
-# 4. Перезапустите терминал
-
-# Проверка:
-ffmpeg -version
-```
-
-### 2. Клонируйте репозиторий
-
-```powershell
-cd C:\Users\<User>\Documents
-git clone <repo-url> infinity-room-panel
-cd infinity-room-panel
-```
-
-### 3. Соберите фронтенд
-
-```powershell
-cd frontend
-npm install --legacy-peer-deps
-npm run build
-cd ..
-```
-
-### 4. Соберите бэкенд
-
-```powershell
-go mod tidy
-go build -o backend/audiobot-panel.exe ./backend/
-```
-
-### 5. Запустите
-
-См. разделы [Запуск веб-версии](#запуск-веб-версии) или [Запуск Electron-приложения](#запуск-electron-приложения).
-
----
-
-## Развертывание на Linux
-
-### 1. Установите зависимости
-
-**Go:**
-```bash
-# Через snap
-sudo snap install go --classic
-
-# Или через apt (Ubuntu 22.04+)
-sudo apt update
-sudo apt install golang-go
-
-# Или скачайте с https://go.dev/dl/
-wget https://go.dev/dl/go1.22.0.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.22.0.linux-amd64.tar.gz
-export PATH=$PATH:/usr/local/go/bin
-
-# Проверка:
-go version
-```
-
-**Node.js:**
-```bash
-# Через NodeSource (Ubuntu/Debian)
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
-
-# Или через nvm
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-nvm install 20
-
-# Проверка:
-node --version
-npm --version
-```
-
-**ffmpeg:**
-```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install ffmpeg
-
-# CentOS/RHEL
-sudo yum install epel-release
-sudo yum install ffmpeg
-
-# Arch
-sudo pacman -S ffmpeg
-
-# Проверка:
-ffmpeg -version
-```
-
-### 2. Клонируйте репозиторий
+### Linux amd64
 
 ```bash
-cd ~
-git clone <repo-url> infinity-room-panel
-cd infinity-room-panel
+# Скачайте архив
+wget https://github.com/juushimatsu/infinity-room-panel/releases/latest/download/audiobot-panel-linux-amd64.tar.gz
+
+# Распакуйте
+tar xzf audiobot-panel-linux-amd64.tar.gz
+cd audiobot-panel-linux-amd64
+
+# Запустите Electron (десктоп)
+./electron-app/audiobot-panel-electron-linux-x64/audiobot-panel-electron
+
+# Или headless (доступ через браузер http://localhost:8080)
+./audiobot-panel
 ```
 
-### 3. Соберите фронтенд
+### Linux arm64
 
 ```bash
-cd frontend
-npm install --legacy-peer-deps
-npm run build
-cd ..
+wget https://github.com/juushimatsu/infinity-room-panel/releases/latest/download/audiobot-panel-linux-arm64.tar.gz
+tar xzf audiobot-panel-linux-arm64.tar.gz
+cd audiobot-panel-linux-arm64
+
+# Electron (требует системные библиотеки — см. ниже)
+./electron-app/audiobot-panel-electron-linux-arm64/audiobot-panel-electron
+
+# Или headless
+./audiobot-panel
 ```
 
-### 4. Соберите бэкенд
+Для Electron на ARM может потребоваться установка библиотек:
 
-```bash
-go mod tidy
-go build -o backend/audiobot-panel ./backend/
-```
-
-### 5. Запустите
-
-См. раздел [Запуск веб-версии](#запуск-веб-версии) ниже.
-
----
-
-## Развертывание на слабых ARM-устройствах
-
-> Для одноплатных компьютеров на ARM64 (Orange Pi, Raspberry Pi 4/5 и т.п.) с 1–4 ГБ RAM, eMMC/microSD. Примеры: Orange Pi Zero 2W (H618), Raspberry Pi 4 (BCM2711). ОС: Armbian/Ubuntu Server arm64.
-
-### 1. Установите зависимости
-
-**Go (arm64):**
-```bash
-wget https://go.dev/dl/go1.22.0.linux-arm64.tar.gz
-sudo tar -C /usr/local -xzf go1.22.0.linux-arm64.tar.gz
-export PATH=$PATH:/usr/local/go/bin
-go version
-```
-
-**Node.js LTS (arm64):**
-```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
-node --version
-npm --version
-```
-
-**ffmpeg:**
-```bash
-sudo apt update && sudo apt install -y ffmpeg
-ffmpeg -version
-```
-
-**Системные библиотеки для Electron:**
 ```bash
 sudo apt install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2
 ```
 
-### 2. Клонируйте репозиторий
+### Windows amd64
+
+Скачайте `audiobot-panel-windows-amd64.zip`, распакуйте.
+
+```
+# Electron (десктоп)
+electron-app\audiobot-panel-electron-win32-x64\audiobot-panel-electron.exe
+
+# Или headless
+audiobot-panel.exe
+```
+
+### Windows 32-bit
+
+Скачайте `audiobot-panel-windows-386.zip`, распакуйте.
+
+Только headless-режим (Electron 30+ не поддерживает ia32):
+
+```
+audiobot-panel.exe
+```
+
+Откройте `http://localhost:8080` в браузере.
+
+---
+
+## Сборка из исходников
+
+### Зависимости
+
+| Компонент | Версия | Установка |
+|---|---|---|
+| Go | 1.25+ | https://go.dev/dl/ или `winget install GoLang.Go` |
+| Node.js | 20+ | https://nodejs.org/ или `winget install OpenJS.NodeJS.LTS` |
+| npm | 10+ | Входит в Node.js |
+| ffmpeg | любой | См. [раздел ниже](#установка-ffmpeg) |
+| Git | любой | https://git-scm.com/ |
+
+### Клонируйте репозиторий
 
 ```bash
-cd ~
-git clone <repo-url> infinity-room-panel
+git clone https://github.com/juushimatsu/infinity-room-panel.git
 cd infinity-room-panel
 ```
 
-### 3. Соберите фронтенд
+### Соберите фронтенд
 
 ```bash
 cd frontend
-npm install --legacy-peer-deps
+npm ci
 npm run build
 cd ..
 ```
 
-Сборка создаёт `frontend/build/` с предзжатыми `.gz`/`.br` версиями статики. Source maps не генерируются.
-
-### 4. Кросс-сборка бэкенда (arm64)
-
-Сборка **на самом устройстве** (не кросс-компиляция с другой машины):
-```bash
-GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o backend/audiobot-panel ./backend/
-```
-
-- `-trimpath` убирает пути исходников из бинарника.
-- `-ldflags="-s -w"` strip-ит debug-символы и DWARF, уменьшая размер ~20%.
-- **Не используйте UPX** — декомпрессия на Cortex-A53 удлиняет старт вместо ускорения.
-
-### 5. Установите Electron (arm64)
+### Соберите бэкенд
 
 ```bash
-cd electron
-npm install --arch=arm64
-cd ..
+go mod tidy
+go build -o backend/audiobot-panel ./backend/   # Linux
+go build -o backend/audiobot-panel.exe ./backend/ # Windows
 ```
 
-> `node_modules` с Windows-машины **не совместимы** с arm64. Всегда выполняйте `npm install` на устройстве.
-
-### 6. Запустите Electron-приложение
+### Соберите всё сразу (все платформы)
 
 ```bash
-cd electron
-npm start
+bash build.sh v1.1.0
 ```
 
-Если Electron падает с ошибкой `The SUID sandbox helper binary was not found` или `running as root without --no-sandbox`, установите suid-бит на chrome-sandbox:
-
-```bash
-# Найдите chrome-sandbox в node_modules/electron
-electron_sandbox="$(find electron/node_modules/electron -name chrome-sandbox | head -1)"
-if [ -n "$electron_sandbox" ]; then
-  sudo chown root "$electron_sandbox"
-  sudo chmod 4755 "$electron_sandbox"
-fi
-```
-
-После этого `npm start` запустится без `--no-sandbox`. **Не добавляйте `--no-sandbox` в скрипт по умолчанию** — это снижает безопасность.
-
-Если suid-бит не помог или вы запускаете от root, добавьте `--no-sandbox` одноразово:
-```bash
-cd electron
-npx electron . --no-sandbox
-```
-
-### 7. (Альтернатива) Запуск без Electron — веб-версия
-
-Если Electron не нужен (headless, без монитора), запустите только бэкенд:
-```bash
-./backend/audiobot-panel
-# Откройте http://<ip-устройства>:8080 в браузере на другой машине
-```
+Скрипт соберёт фронтенд, Go-бинарники для linux/amd64, linux/arm64, windows/amd64, windows/386, упакует Electron и создаст архивы в `dist/`.
 
 ---
 
-## Запуск веб-версии
+## Запуск
 
-### Прямой запуск (разработка / тестирование)
+### Electron-приложение (десктоп)
+
+```bash
+cd electron
+npm install
+npm start
+```
+
+При запуске Electron:
+1. Автоматически выбирается свободный порт
+2. Запускается Go-бэкенд с `ELECTRON_MODE=1`
+3. Открывается окно с UI
+4. **Пароль не требуется** — аутентификация отключена
+
+При закрытии окна бэкенд-процесс автоматически завершается.
+
+> **ARM-устройства**: Electron на ARM требует системные библиотеки (см. выше). При ошибке SUID sandbox выполните:
+> ```bash
+> sudo chown root "$(find electron/node_modules/electron -name chrome-sandbox | head -1)"
+> sudo chmod 4755 "$(find electron/node_modules/electron -name chrome-sandbox | head -1)"
+> ```
+> Или запустите с `--no-sandbox`: `npx electron . --no-sandbox`
+
+### Headless (доступ через браузер)
 
 ```bash
 # Linux
@@ -317,9 +187,9 @@ npx electron . --no-sandbox
 
 Пароль хранится в хешированном виде в `config/auth.json`. При последующих запусках пароль не генерируется повторно.
 
-### Настройка порта
+Откройте `http://localhost:8080` в браузере и введите пароль.
 
-По умолчанию сервер запускается на порту `8080`. Изменить порт:
+### Настройка порта
 
 ```bash
 # Linux
@@ -328,12 +198,6 @@ PORT=3000 ./backend/audiobot-panel
 # Windows (PowerShell)
 $env:PORT="3000"; .\backend\audiobot-panel.exe
 ```
-
-### Откройте панель
-
-Перейдите в браузере: `http://localhost:8080` (или выбранный порт).
-
-Введите пароль, полученный при первом запуске.
 
 ### Запуск как systemd-сервис (Linux)
 
@@ -348,7 +212,7 @@ After=network.target
 Type=simple
 User=audiobot
 WorkingDirectory=/opt/audiobot-panel
-ExecStart=/opt/audiobot-panel/backend/audiobot-panel
+ExecStart=/opt/audiobot-panel/audiobot-panel
 Environment=PORT=8080
 Restart=on-failure
 RestartSec=5
@@ -368,59 +232,6 @@ sudo systemctl start audiobot-panel
 sudo journalctl -u audiobot-panel -f
 ```
 
-### Запуск через Docker (опционально)
-
-```dockerfile
-FROM golang:1.22-bookworm AS builder
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN go build -o backend/audiobot-panel ./backend/
-
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
-WORKDIR /app
-COPY --from=builder /app/backend/audiobot-panel ./backend/
-COPY --from=builder /app/frontend/build ./frontend/build/
-COPY --from=builder /app/data ./data/
-EXPOSE 8080
-CMD ["./backend/audiobot-panel"]
-```
-
-```bash
-docker build -t audiobot-panel .
-docker run -p 8080:8080 -v audiobot-data:/app/data -v audiobot-config:/app/config audiobot-panel
-# Пароль будет в логах контейнера:
-docker logs <container-id>
-```
-
----
-
-## Запуск Electron-приложения
-
-> Только для Windows/macOS/Linux (десктоп).
-
-### Предварительная сборка
-
-Убедитесь, что бэкенд уже скомпилирован (см. шаг 4 выше).
-
-### Установка и запуск
-
-```bash
-cd electron
-npm install
-npm start
-```
-
-При запуске Electron:
-1. Автоматически выбирается свободный порт
-2. Запускается Go-бэкенд с `ELECTRON_MODE=1`
-3. Открывается окно браузера с UI
-4. **Пароль не требуется** — аутентификация отключена
-
-При закрытии окна — бэкенд-процесс автоматически завершается.
-
 ---
 
 ## Установка ffmpeg
@@ -430,13 +241,13 @@ ffmpeg необходим для конвертации MP3 → Opus. Без н�
 ### Windows
 
 ```powershell
-# Способ 1: winget (рекомендуется)
+# Через winget (рекомендуется)
 winget install Gyan.FFmpeg
 
-# Способ 2: Chocolatey
+# Через Chocolatey
 choco install ffmpeg
 
-# Способ 3: Вручную
+# Вручную:
 # 1. Скачайте https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
 # 2. Распакуйте в C:\ffmpeg
 # 3. Добавьте C:\ffmpeg\bin в системный PATH
@@ -498,9 +309,9 @@ infinity-room-panel/
 ### Сброс пароля (веб-версия)
 
 ```bash
-# Удалите файл конфигурации — при следующем запуске будет сгенерирован новый пароль
-rm config/auth.json       # Linux
-del config\auth.json       # Windows
+rm config/auth.json         # Linux
+del config\auth.json         # Windows
+# При следующем запуске будет сгенерирован новый пароль
 ```
 
 ---
@@ -521,9 +332,12 @@ del config\auth.json       # Windows
 |---|---|---|
 | `POST` | `/api/audio/upload` | Загрузить MP3 (multipart form) |
 | `GET` | `/api/audio/list` | Список загруженных файлов |
-| `POST` | `/api/session/start` | Запустить сессию ботов |
-| `POST` | `/api/session/stop` | Остановить сессию |
-| `GET` | `/api/session/status` | WebSocket: live-статус ботов |
+| `POST` | `/api/room/start` | Запустить комнату с ботами |
+| `POST` | `/api/room/stop` | Остановить комнату |
+| `GET` | `/api/room/list` | Список активных комнат |
+| `GET` | `/api/room/status` | WebSocket: live-статус ботов |
+| `POST` | `/api/room/pause` | Пауза ботов в комнате (для координации с olcrtc) |
+| `POST` | `/api/room/resume` | Возобновление ботов после паузы |
 
 ### Примеры запросов
 
@@ -538,8 +352,24 @@ curl -X POST -H "Authorization: Bearer <token>" \
 ```bash
 curl -X POST -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -d '{"service":"jitsi","room_input":"https://meet.cryptopro.ru/e4r56y","bot_count":2,"file_id":"<id>","loop":true}' \
-  http://localhost:8080/api/session/start
+  -d '{"service":"wbstream","room_input":"https://stream.wb.ru/streams/abc123","bot_count":2,"file_id":"<id>","loop":true}' \
+  http://localhost:8080/api/room/start
+```
+
+**Пауза ботов (перед запуском olcrtc-туннеля):**
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"room_id":"room_1"}' \
+  http://localhost:8080/api/room/pause
+```
+
+**Возобновление ботов:**
+```bash
+curl -X POST -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"room_id":"room_1"}' \
+  http://localhost:8080/api/room/resume
 ```
 
 ---
@@ -552,14 +382,11 @@ curl -X POST -H "Authorization: Bearer <token>" \
 
 1. Убедитесь, что фронтенд собран: `cd frontend && npm run build`
 2. Запускайте бинарник из корня проекта: `cd infinity-room-panel && ./backend/audiobot-panel`
-3. Или запускайте через `go run`: `go run ./backend/`
+3. Или используйте предсобранный архив из релиза
 
 ### Electron запрашивает пароль
 
-Бэкенд должен запускаться с переменной `ELECTRON_MODE=1`. Проверьте:
-- `electron/main.js` передаёт `ELECTRON_MODE: '1'` в `env` при spawn
-- Go-бинарник запускается с `cwd: projectRoot` (корень проекта)
-- Пересоберите фронтенд после обновления кода: `cd frontend && npm run build`
+Бэкенд должен запускаться с переменной `ELECTRON_MODE=1`. Это автоматически делается Electron-обёрткой. Если пароль запрашивается — проверьте, что запускаете через `npm start` в директории `electron/`, а не бэкенд напрямую.
 
 ### «ffmpeg not found» / аудио не загружается
 
@@ -572,16 +399,13 @@ ffmpeg -version
 
 ### Ошибка «invalid token» (веб-версия)
 
-JWT-токен истекает через 24 часа. Получите новый:
-1. Откройте панель в браузере
-2. Введите пароль заново
+JWT-токен истекает через 24 часа. Получите новый: откройте панель в браузере и введите пароль заново.
 
 ### Сброс всего
 
 ```bash
-# Удалить конфиг и данные
-rm -rf config/ data/audio/    # Linux
-rmdir /s config data\audio    # Windows
+rm -rf config/ data/audio/     # Linux
+rmdir /s config data\audio     # Windows
 
 # При следующем запуске будет сгенерирован новый пароль
 ```
@@ -589,7 +413,6 @@ rmdir /s config data\audio    # Windows
 ### Порт занят
 
 ```bash
-# Указать другой порт
-PORT=3000 ./backend/audiobot-panel    # Linux
-$env:PORT="3000"; .\backend\audiobot-panel.exe   # Windows PowerShell
+PORT=3000 ./backend/audiobot-panel              # Linux
+$env:PORT="3000"; .\backend\audiobot-panel.exe  # Windows PowerShell
 ```

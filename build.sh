@@ -28,6 +28,7 @@ TARGETS=(
   "linux/amd64"
   "linux/arm64"
   "windows/amd64"
+  "windows/386"
 )
 
 for TARGET in "${TARGETS[@]}"; do

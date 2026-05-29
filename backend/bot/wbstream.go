@@ -14,16 +14,21 @@ import (
 	"time"
 
 	lksdk "github.com/livekit/server-sdk-go/v2"
-	webrtcv3 "github.com/pion/webrtc/v3"
-	media3 "github.com/pion/webrtc/v3/pkg/media"
+	"github.com/pion/webrtc/v4"
+	"github.com/pion/webrtc/v4/pkg/media"
 )
 
 // wbAPIBase is the base URL for WB Stream API.
 const wbAPIBase = "https://stream.wb.ru"
 
 // RunWBStreamBot connects a bot to a WB Stream room via LiveKit
-// and streams Opus audio frames.
-// Based on olcrtc/internal/auth/wbstream and internal/engine/livekit reference.
+// and streams Opus audio frames at reduced bitrate.
+//
+// Compared to the original v2.1.2 implementation:
+//   - Uses pion/webrtc v4 (via SDK v2.16.2) — same as olcrtc, eliminates SDP/ICE mismatch
+//   - Uses webrtc.NewTrackLocalStaticSample instead of removed lksdk.NewLocalTrack API
+//   - Opus bitrate reduced from 64 kbps to 24 kbps to minimize AutoSubscribe bandwidth
+//     impact on olcrtc (AutoSubscribe=true causes olcrtc to subscribe to bot audio)
 func RunWBStreamBot(ctx context.Context, botID int, name, roomInput string, opusFrames [][]byte, loop bool, onStatus StatusCallback) error {
 	roomID := parseWBStreamInput(roomInput)
 	if name == "" {
@@ -52,35 +57,23 @@ func RunWBStreamBot(ctx context.Context, botID int, name, roomInput string, opus
 		return fmt.Errorf("join livekit room: %w", err)
 	}
 
-	audioTrack, err := lksdk.NewLocalTrack(webrtcv3.RTPCodecCapability{
-		MimeType:  webrtcv3.MimeTypeOpus,
-		ClockRate: 48000,
-		Channels:  1,
-	})
+	audioTrack, err := webrtc.NewTrackLocalStaticSample(
+		webrtc.RTPCodecCapability{
+			MimeType:  webrtc.MimeTypeOpus,
+			ClockRate: 48000,
+			Channels:  1,
+		},
+		fmt.Sprintf("bot%d-audio", botID),
+		fmt.Sprintf("bot%d-stream", botID),
+	)
 	if err != nil {
-		return fmt.Errorf("create local track: %w", err)
+		return fmt.Errorf("create audio track: %w", err)
 	}
 
 	if _, err := room.LocalParticipant.PublishTrack(audioTrack, &lksdk.TrackPublicationOptions{
 		Name: fmt.Sprintf("bot%d-audio", botID),
 	}); err != nil {
 		return fmt.Errorf("publish audio track: %w", err)
-	}
-
-	bindCh := make(chan struct{}, 1)
-	audioTrack.OnBind(func() {
-		select {
-		case bindCh <- struct{}{}:
-		default:
-		}
-	})
-
-	select {
-	case <-bindCh:
-	case <-time.After(10 * time.Second):
-		return fmt.Errorf("track bind timeout")
-	case <-ctx.Done():
-		return ctx.Err()
 	}
 
 	if onStatus != nil {
@@ -100,11 +93,11 @@ func RunWBStreamBot(ctx context.Context, botID int, name, roomInput string, opus
 			if !ok {
 				return nil
 			}
-			sample := media3.Sample{
+			sample := media.Sample{
 				Data:     frame,
 				Duration: 20 * time.Millisecond,
 			}
-			if err := audioTrack.WriteSample(sample, nil); err != nil {
+			if err := audioTrack.WriteSample(sample); err != nil {
 				return fmt.Errorf("write sample: %w", err)
 			}
 		}
@@ -117,10 +110,8 @@ type wbConnDetails struct {
 }
 
 // parseWBStreamInput extracts the room ID from user input.
-// Accepts either a raw room ID or a URL like https://stream.wb.ru/streams/ROOM_ID
 func parseWBStreamInput(input string) string {
 	input = strings.TrimSpace(input)
-	// If it's a URL, extract the last path segment as room ID
 	if strings.HasPrefix(input, "http://") || strings.HasPrefix(input, "https://") {
 		parts := strings.Split(input, "/")
 		for i := len(parts) - 1; i >= 0; i-- {
@@ -132,8 +123,6 @@ func parseWBStreamInput(input string) string {
 	return input
 }
 
-// guestRegisterRequest matches the olcrtc/internal/auth/wbstream/api.go struct exactly.
-// The WB Stream API uses proto3 JSON mapping (camelCase) — confirmed by olcrtc and Python PoC.
 type guestRegisterRequest struct {
 	DisplayName string `json:"displayName"`
 	Device      struct {
@@ -151,8 +140,6 @@ type tokenResponse struct {
 	ServerURL string `json:"serverUrl"`
 }
 
-// wbNewHTTPTransport creates an HTTP transport matching olcrtc protect.NewHTTPTransport.
-// Uses proper TLS config (MinVersion TLS12, no InsecureSkipVerify), HTTP/2, and sane timeouts.
 func wbNewHTTPTransport() *http.Transport {
 	return &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
@@ -165,13 +152,6 @@ func wbNewHTTPTransport() *http.Transport {
 	}
 }
 
-// wbSafePOST performs a POST request with proper redirect handling.
-// Go's http.Client changes POST→GET and drops the body on 301/302 redirects.
-// This function manually follows redirects while preserving the POST method and body.
-//
-// Uses bytes.NewReader instead of bytes.NewBuffer so that Go can determine
-// Content-Length explicitly (NewReader implements io.Seeker). This is critical
-// for gRPC-gateway servers which may not support Transfer-Encoding: chunked.
 func wbSafePOST(ctx context.Context, rawURL, contentType string, body []byte, headers map[string]string) (*http.Response, error) {
 	noRedirectClient := &http.Client{
 		Timeout:   30 * time.Second,
@@ -185,15 +165,12 @@ func wbSafePOST(ctx context.Context, rawURL, contentType string, body []byte, he
 	currentURL := rawURL
 
 	for i := 0; i < maxRedirects; i++ {
-		// Use bytes.NewReader — it implements io.Seeker, so Go sets
-		// Content-Length header explicitly instead of using chunked encoding.
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, currentURL, bytes.NewReader(body))
 		if err != nil {
 			return nil, fmt.Errorf("create request: %w", err)
 		}
 		req.Header.Set("Content-Type", contentType)
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Linux x86_64)")
-		// Set Content-Length explicitly to ensure body is not sent as chunked
 		req.ContentLength = int64(len(body))
 		for k, v := range headers {
 			req.Header.Set(k, v)
@@ -209,19 +186,16 @@ func wbSafePOST(ctx context.Context, rawURL, contentType string, body []byte, he
 		log.Printf("[wbstream] POST response status=%d Location=%s headers=%v",
 			resp.StatusCode, resp.Header.Get("Location"), resp.Header)
 
-		// Not a redirect — return the response
 		if resp.StatusCode < 300 || resp.StatusCode >= 400 {
 			return resp, nil
 		}
 
-		// It's a redirect — follow it manually, preserving POST method and body
 		loc := resp.Header.Get("Location")
 		_ = resp.Body.Close()
 		if loc == "" {
 			return nil, fmt.Errorf("redirect with no Location header")
 		}
 
-		// Resolve relative URLs
 		if !strings.HasPrefix(loc, "http") {
 			base, err := url.Parse(currentURL)
 			if err != nil {
@@ -283,7 +257,6 @@ func wbGuestRegister(ctx context.Context, displayName string) (string, error) {
 func wbJoinRoom(ctx context.Context, roomID, accessToken string) error {
 	u := fmt.Sprintf("%s/api-room/api/v1/room/%s/join", wbAPIBase, roomID)
 
-	// Body must be empty JSON "{}" — matching olcrtc/internal/auth/wbstream/api.go
 	resp, err := wbSafePOST(ctx, u, "application/json", []byte("{}"), map[string]string{
 		"Authorization": "Bearer " + accessToken,
 	})
@@ -309,7 +282,6 @@ func wbGetConnectionDetails(ctx context.Context, roomID, accessToken, displayNam
 		return nil, err
 	}
 
-	// Query params matching olcrtc/internal/auth/wbstream/api.go
 	q := req.URL.Query()
 	q.Add("deviceType", "PARTICIPANT_DEVICE_TYPE_WEB_DESKTOP")
 	q.Add("displayName", displayName)

@@ -165,6 +165,8 @@ func main() {
 	apiRouter.HandleFunc("/audio/list", server.HandleAudioList).Methods("GET")
 	apiRouter.HandleFunc("/room/start", server.HandleRoomStart).Methods("POST")
 	apiRouter.HandleFunc("/room/stop", server.HandleRoomStop).Methods("POST")
+	apiRouter.HandleFunc("/room/pause", server.HandleRoomPause).Methods("POST")
+	apiRouter.HandleFunc("/room/resume", server.HandleRoomResume).Methods("POST")
 	apiRouter.HandleFunc("/room/list", server.HandleRoomsList).Methods("GET")
 	apiRouter.HandleFunc("/room/status", server.HandleSessionStatusWS).Methods("GET")
 
