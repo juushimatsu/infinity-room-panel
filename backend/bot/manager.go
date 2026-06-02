@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	"audiobot-panel/backend/config"
+	"audiobot-panel/backend/storage"
 	"audiobot-panel/data/names"
 
 	"github.com/pion/webrtc/v4"
@@ -54,22 +56,39 @@ type Room struct {
 }
 
 type BotManager struct {
-	mu         sync.Mutex
-	rooms      map[string]*Room
-	statusSubs []chan StatusEvent
-	storage    AudioStorage
-	nextRoomID int
+	mu           sync.Mutex
+	rooms        map[string]*Room
+	statusSubs   []chan StatusEvent
+	storage      AudioStorage
+	configStore  *storage.RoomConfigStore
+	nextRoomID   int
+	wbKeeperCfg  *config.WBAccountConfig
+	wbKeeperStop chan struct{}
 }
 
 type AudioStorage interface {
 	GetFilePath(fileID string) (string, error)
 }
 
-func NewBotManager(storage AudioStorage) *BotManager {
-	return &BotManager{
-		rooms:   make(map[string]*Room),
-		storage: storage,
+// NewBotManager creates a bot manager with optional room config persistence.
+func NewBotManager(stor AudioStorage, cfgStore *storage.RoomConfigStore) *BotManager {
+	m := &BotManager{
+		rooms:        make(map[string]*Room),
+		storage:      stor,
+		configStore:  cfgStore,
+		wbKeeperStop: make(chan struct{}, 1),
 	}
+	if cfgStore != nil {
+		// Load persisted configs to determine nextRoomID.
+		for _, cfg := range cfgStore.GetAll() {
+			idNum := 0
+			fmt.Sscanf(cfg.ID, "room_%d", &idNum)
+			if idNum > m.nextRoomID {
+				m.nextRoomID = idNum
+			}
+		}
+	}
+	return m
 }
 
 // StartRoom creates a new room session and starts bots.
@@ -105,6 +124,17 @@ func (m *BotManager) StartRoom(service, roomInput string, botCount int, fileID s
 	}
 	m.rooms[roomID] = room
 
+	if m.configStore != nil {
+		_ = m.configStore.Save(storage.RoomConfig{
+			ID:        roomID,
+			Service:   service,
+			RoomInput: roomInput,
+			BotCount:  botCount,
+			FileID:    fileID,
+			Loop:      loop,
+		})
+	}
+
 	for i := 1; i <= botCount; i++ {
 		ctx, cancel := context.WithCancel(context.Background())
 		name := names.GenerateName()
@@ -126,7 +156,7 @@ func (m *BotManager) StartRoom(service, roomInput string, botCount int, fileID s
 	return roomID, nil
 }
 
-// StopRoom stops all bots in a specific room.
+// StopRoom stops all bots in a specific room but keeps its config.
 func (m *BotManager) StopRoom(roomID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -146,6 +176,75 @@ func (m *BotManager) StopRoom(roomID string) error {
 
 	room.Active = false
 	delete(m.rooms, roomID)
+	return nil
+}
+
+// DeleteRoom stops bots and removes the room config entirely.
+func (m *BotManager) DeleteRoom(roomID string) error {
+	m.mu.Lock()
+	room, ok := m.rooms[roomID]
+	if ok {
+		for _, bot := range room.Bots {
+			if bot.cancelFunc != nil {
+				bot.cancelFunc()
+			}
+			bot.info.Status = StatusStopped
+			m.emitStatus(bot.info.ID, bot.info.Name, StatusStopped, "", roomID)
+		}
+		delete(m.rooms, roomID)
+	}
+	m.mu.Unlock()
+
+	if m.configStore != nil {
+		_ = m.configStore.Delete(roomID)
+	}
+	return nil
+}
+
+// RestartRoom stops and restarts a room from its saved config.
+func (m *BotManager) RestartRoom(roomID string) error {
+	m.StopRoom(roomID)
+
+	if m.configStore == nil {
+		return fmt.Errorf("no config store")
+	}
+	cfg, ok := m.configStore.Get(roomID)
+	if !ok {
+		return fmt.Errorf("room config not found: %s", roomID)
+	}
+	_, err := m.StartRoom(cfg.Service, cfg.RoomInput, cfg.BotCount, cfg.FileID, cfg.Loop)
+	return err
+}
+
+// UpdateRoomConfig updates persisted settings and restarts the room if active.
+func (m *BotManager) UpdateRoomConfig(roomID, service, roomInput string, botCount int, fileID string, loop bool) error {
+	m.mu.Lock()
+	room, active := m.rooms[roomID]
+	if active {
+		for _, bot := range room.Bots {
+			if bot.cancelFunc != nil {
+				bot.cancelFunc()
+			}
+		}
+		delete(m.rooms, roomID)
+	}
+	m.mu.Unlock()
+
+	if m.configStore != nil {
+		_ = m.configStore.Save(storage.RoomConfig{
+			ID:        roomID,
+			Service:   service,
+			RoomInput: roomInput,
+			BotCount:  botCount,
+			FileID:    fileID,
+			Loop:      loop,
+		})
+	}
+
+	if active {
+		_, err := m.StartRoom(service, roomInput, botCount, fileID, loop)
+		return err
+	}
 	return nil
 }
 
@@ -307,21 +406,43 @@ func (m *BotManager) Unsubscribe(ch chan StatusEvent) {
 	}
 }
 
-// GetRooms returns info about all active rooms.
+// GetRooms returns info about all rooms (active and inactive) from config store.
 func (m *BotManager) GetRooms() []RoomInfo {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	result := make([]RoomInfo, 0, len(m.rooms))
-	for _, room := range m.rooms {
-		ri := RoomInfo{
-			ID:        room.ID,
-			Service:   room.Service,
-			RoomInput: room.RoomInput,
-			Active:    room.Active,
+	var configs []storage.RoomConfig
+	if m.configStore != nil {
+		configs = m.configStore.GetAll()
+	} else {
+		// Fallback: only active rooms.
+		for _, room := range m.rooms {
+			configs = append(configs, storage.RoomConfig{
+				ID:        room.ID,
+				Service:   room.Service,
+				RoomInput: room.RoomInput,
+				BotCount:  len(room.Bots),
+			})
 		}
-		for _, bot := range room.Bots {
-			ri.Bots = append(ri.Bots, bot.info)
+	}
+
+	result := make([]RoomInfo, 0, len(configs))
+	for _, cfg := range configs {
+		ri := RoomInfo{
+			ID:        cfg.ID,
+			Service:   cfg.Service,
+			RoomInput: cfg.RoomInput,
+			Active:    false,
+			BotCount:  cfg.BotCount,
+			FileID:    cfg.FileID,
+			Loop:      cfg.Loop,
+			Bots:      []BotInfo{},
+		}
+		if room, ok := m.rooms[cfg.ID]; ok {
+			ri.Active = room.Active
+			for _, bot := range room.Bots {
+				ri.Bots = append(ri.Bots, bot.info)
+			}
 		}
 		result = append(result, ri)
 	}
@@ -333,6 +454,9 @@ type RoomInfo struct {
 	Service   string    `json:"service"`
 	RoomInput string    `json:"room_input"`
 	Active    bool      `json:"active"`
+	BotCount  int       `json:"bot_count"`
+	FileID    string    `json:"file_id"`
+	Loop      bool      `json:"loop"`
 	Bots      []BotInfo `json:"bots"`
 }
 
@@ -340,6 +464,14 @@ func (m *BotManager) IsActive() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return len(m.rooms) > 0
+}
+
+// GetRoomConfig returns the persisted config for a room (if any).
+func (m *BotManager) GetRoomConfig(roomID string) (storage.RoomConfig, bool) {
+	if m.configStore == nil {
+		return storage.RoomConfig{}, false
+	}
+	return m.configStore.Get(roomID)
 }
 
 // CreateOpusTrack creates a sendonly Opus audio track for WebRTC.

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -190,16 +191,31 @@ func LoadAudioFile(mp3Path string) ([][]byte, error) {
 		mp3Path += ".mp3"
 	}
 
+	log.Printf("[audio] loading file: %s", mp3Path)
+
+	fi, err := os.Stat(mp3Path)
+	if err != nil {
+		return nil, fmt.Errorf("stat mp3: %w", err)
+	}
+	log.Printf("[audio] file size: %d bytes", fi.Size())
+
+	// Verify ffmpeg is available.
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		return nil, fmt.Errorf("ffmpeg not found in PATH: %w", err)
+	}
+
 	pcm, err := DecodeMP3ToPCM(mp3Path)
 	if err != nil {
 		return nil, fmt.Errorf("decode mp3: %w", err)
 	}
+	log.Printf("[audio] decoded PCM: %d samples", len(pcm))
 
 	frames, err := EncodePCMToOpusFrames(pcm)
 	if err != nil {
 		return nil, fmt.Errorf("encode opus: %w", err)
 	}
 
+	log.Printf("[audio] opus frames: %d frames ready", len(frames))
 	return frames, nil
 }
 

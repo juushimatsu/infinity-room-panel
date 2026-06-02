@@ -37,13 +37,25 @@ function getInitials(name: string): string {
 interface RoomCardProps {
   room: RoomInfo;
   onStop: () => void;
+  onStart: () => void;
+  onRestart: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }
 
-const RoomCard = ({ room, onStop }: RoomCardProps) => {
+const RoomCard = ({
+  room,
+  onStop,
+  onStart,
+  onRestart,
+  onEdit,
+  onDelete,
+}: RoomCardProps) => {
   const activeBots = room.bots.filter(
     (b) => b.status === "active" || b.status === "connecting",
   );
   const hasError = room.bots.some((b) => b.status === "error");
+  const isActive = room.active;
 
   return (
     <div className="card room-card">
@@ -54,16 +66,63 @@ const RoomCard = ({ room, onStop }: RoomCardProps) => {
           </span>
           <span className="room-input-text">{room.room_input}</span>
         </div>
-        <button
-          className="btn btn-secondary btn-sm"
-          onClick={onStop}
-          type="button"
-        >
-          Остановить
-        </button>
+        <div className="room-actions">
+          {isActive ? (
+            <>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={onRestart}
+                type="button"
+                title="Перезапустить"
+              >
+                ⟳
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={onEdit}
+                type="button"
+                title="Редактировать"
+              >
+                ✎
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={onStop}
+                type="button"
+              >
+                Остановить
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={onStart}
+                type="button"
+              >
+                Запустить
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={onEdit}
+                type="button"
+                title="Редактировать"
+              >
+                ✎
+              </button>
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={onDelete}
+                type="button"
+              >
+                Удалить
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {room.bots.length > 0 && (
+      {room.bots.length > 0 && isActive && (
         <div className="bot-status-list">
           {room.bots.map((bot) => (
             <div key={bot.bot_id} className="bot-status-card">
@@ -81,6 +140,12 @@ const RoomCard = ({ room, onStop }: RoomCardProps) => {
               </span>
             </div>
           ))}
+        </div>
+      )}
+
+      {!isActive && (
+        <div className="room-inactive-hint">
+          Комната остановлена. Нажмите «Запустить» для запуска ботов.
         </div>
       )}
     </div>

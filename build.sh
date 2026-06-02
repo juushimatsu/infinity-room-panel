@@ -31,6 +31,11 @@ TARGETS=(
   "windows/386"
 )
 
+# Native build hint: on ARM devices (e.g. Orange Pi Zero 2W), build natively
+# with CGO_ENABLED=1 if the toolchain supports it, or CGO_ENABLED=0 otherwise.
+# Pre-built linux/arm64 binaries may exhibit audio issues on some ARM boards;
+# building on the device itself typically resolves them.
+
 for TARGET in "${TARGETS[@]}"; do
   OS="${TARGET%%/*}"
   ARCH="${TARGET##*/}"

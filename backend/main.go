@@ -11,6 +11,7 @@ import (
 	"audiobot-panel/backend/api"
 	"audiobot-panel/backend/auth"
 	"audiobot-panel/backend/bot"
+	"audiobot-panel/backend/config"
 	"audiobot-panel/backend/storage"
 
 	"github.com/gorilla/mux"
@@ -135,6 +136,7 @@ func main() {
 	isElectron := os.Getenv("ELECTRON_MODE") == "1"
 	configDir := filepath.Join(projectRoot, "config")
 	audioDir := filepath.Join(projectRoot, "data", "audio")
+	dataDir := filepath.Join(projectRoot, "data")
 
 	// Initialize auth
 	authCfg, err := auth.InitAuth(configDir, isElectron)
@@ -148,11 +150,29 @@ func main() {
 		log.Fatalf("storage init: %v", err)
 	}
 
+	// Initialize room config store
+	roomStore, err := storage.NewRoomConfigStore(dataDir)
+	if err != nil {
+		log.Fatalf("room config store init: %v", err)
+	}
+
+	// Initialize account store
+	accountStore, err := config.NewAccountStore(dataDir)
+	if err != nil {
+		log.Fatalf("account store init: %v", err)
+	}
+
 	// Initialize bot manager
-	manager := bot.NewBotManager(stor)
+	manager := bot.NewBotManager(stor, roomStore)
+
+	// Start WB account keeper if enabled
+	wbCfg := accountStore.Get()
+	if wbCfg.Enabled {
+		manager.RunWBAccountKeeper(&wbCfg)
+	}
 
 	// Create API server
-	server := api.NewServer(manager, stor, authCfg, isElectron)
+	server := api.NewServer(manager, stor, accountStore, authCfg, isElectron)
 
 	// Router
 	r := mux.NewRouter()
@@ -165,10 +185,17 @@ func main() {
 	apiRouter.HandleFunc("/audio/list", server.HandleAudioList).Methods("GET")
 	apiRouter.HandleFunc("/room/start", server.HandleRoomStart).Methods("POST")
 	apiRouter.HandleFunc("/room/stop", server.HandleRoomStop).Methods("POST")
+	apiRouter.HandleFunc("/room/delete", server.HandleRoomDelete).Methods("POST")
+	apiRouter.HandleFunc("/room/restart", server.HandleRoomRestart).Methods("POST")
+	apiRouter.HandleFunc("/room/update", server.HandleRoomUpdate).Methods("POST")
+	apiRouter.HandleFunc("/room/start-from-config", server.HandleRoomStartFromConfig).Methods("POST")
 	apiRouter.HandleFunc("/room/pause", server.HandleRoomPause).Methods("POST")
 	apiRouter.HandleFunc("/room/resume", server.HandleRoomResume).Methods("POST")
 	apiRouter.HandleFunc("/room/list", server.HandleRoomsList).Methods("GET")
 	apiRouter.HandleFunc("/room/status", server.HandleSessionStatusWS).Methods("GET")
+	apiRouter.HandleFunc("/wbstream/account", server.HandleWBAccountGet).Methods("GET")
+	apiRouter.HandleFunc("/wbstream/account", server.HandleWBAccountSet).Methods("POST")
+	apiRouter.HandleFunc("/wbstream/account/stop", server.HandleWBAccountStop).Methods("POST")
 
 	// Auth endpoints (outside apiRouter to skip auth middleware)
 	r.HandleFunc("/api/auth/mode", server.HandleAuthMode).Methods("GET")

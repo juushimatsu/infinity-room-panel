@@ -639,3 +639,37 @@ body {
     gap: var(--md);
     margin-bottom: var(--xl);
 }
+
+/* Room actions */
+.room-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--xs);
+    flex-shrink: 0;
+}
+
+/* Danger button */
+.btn-danger {
+    background-color: var(--error);
+    color: var(--on-primary);
+    padding: 6px 14px;
+    font-size: 13px;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 150ms ease;
+}
+
+.btn-danger:hover:not(:disabled) {
+    filter: brightness(1.1);
+}
+
+/* Inactive room hint */
+.room-inactive-hint {
+    font-size: 13px;
+    color: var(--slate);
+    margin-top: var(--sm);
+    padding: var(--sm) var(--md);
+    background: var(--surface-soft);
+    border-radius: var(--radius-md);
+}

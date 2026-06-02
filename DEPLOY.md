@@ -70,6 +70,34 @@ cd audiobot-panel-linux-arm64
 sudo apt install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libdrm2 libgbm1 libasound2
 ```
 
+### Orange Pi Zero 2W (и другие ARM SBC)
+
+Предварительно собранные бинарники `linux/arm64` могут не воспроизводить аудио на некоторых ARM-платах. **Рекомендуется сборка на самом устройстве:**
+
+```bash
+# 1. Установите Go (1.25+), Node.js (20+), ffmpeg
+curl -LO https://go.dev/dl/go1.25.0.linux-arm64.tar.gz
+sudo tar -C /usr/local -xzf go1.25.0.linux-arm64.tar.gz
+export PATH=$PATH:/usr/local/go/bin
+
+sudo apt update && sudo apt install -y ffmpeg nodejs npm git
+
+# 2. Клонируйте репозиторий и соберите
+git clone https://github.com/juushimatsu/infinity-room-panel.git
+cd infinity-room-panel
+
+# Frontend
+cd frontend && npm ci && npm run build && cd ..
+
+# Backend (CGO_ENABLED=0 — чистый Go, работает везде)
+go build -o audiobot-panel ./backend/
+
+# Запуск
+./audiobot-panel
+```
+
+Если аудио по-прежнему не работает — проверьте `ffmpeg -version` и смотрите логи запуска комнаты (добавлено диагностическое логирование в audio pipeline).
+
 ### Windows amd64
 
 Скачайте `audiobot-panel-windows-amd64.zip`, распакуйте.
@@ -296,14 +324,16 @@ ffmpeg -version
 ```
 infinity-room-panel/
 ├── config/
-│   └── auth.json          # Хеш пароля + JWT-секрет (автосоздаётся)
+│   └── auth.json              # Хеш пароля + JWT-секрет (автосоздаётся)
 ├── data/
 │   ├── audio/
-│   │   ├── metadata.json  # Метаданные загруженных MP3
-│   │   ├── <uuid>.mp3     # Загруженные аудиофайлы
+│   │   ├── metadata.json      # Метаданные загруженных MP3
+│   │   ├── <uuid>.mp3         # Загруженные аудиофайлы
 │   │   └── ...
+│   ├── room_configs.json      # Сохранённые конфигурации комнат
+│   └── wb_account.json        # Настройки WB Stream аккаунта (куки, токены)
 │   └── names/
-│       └── names.go       # Генератор имён (встроен в бинарник)
+│       └── names.go           # Генератор имён (встроен в бинарник)
 ```
 
 ### Сброс пароля (веб-версия)
@@ -338,6 +368,46 @@ del config\auth.json         # Windows
 | `GET` | `/api/room/status` | WebSocket: live-статус ботов |
 | `POST` | `/api/room/pause` | Пауза ботов в комнате (для координации с olcrtc) |
 | `POST` | `/api/room/resume` | Возобновление ботов после паузы |
+| `POST` | `/api/room/delete` | Удалить комнату из панели (останавливает ботов + удаляет конфиг) |
+| `POST` | `/api/room/restart` | Перезапустить комнату |
+| `POST` | `/api/room/update` | Изменить настройки комнаты (URL, боты, аудио) |
+| `POST` | `/api/room/start-from-config` | Запустить остановленную комнату из сохранённого конфига |
+| `GET` | `/api/wbstream/account` | Получить настройки WB Stream аккаунта для антиотключения |
+| `POST` | `/api/wbstream/account` | Сохранить настройки WB Stream аккаунта |
+
+### WB Stream — антиотключение комнат
+
+WB Stream периодически отключает комнаты, если в них только гостевые боты. Чтобы этого избежать, панель может заходить в комнаты под вашим авторизованным аккаунтом (без публикации аудио) с заданным интервалом.
+
+#### Настройка
+
+1. В панели нажмите **«⚙️ WB Аккаунт»**
+2. Вставьте JSON dump из WB Stream в поле «JSON dump» и нажмите **«Разобрать JSON»**
+3. Настройте интервал (рекомендуется 300 секунд = 5 минут)
+4. Включите тумблер и нажмите **«Сохранить»**
+
+#### Как достать JSON dump
+
+**Способ 1 — через браузер (сайт https://stream.wb.ru/):**
+1. Откройте https://stream.wb.ru/, войдите в аккаунт
+2. Нажмите F12 → Console
+3. Скопируйте содержимое файла `scripts/wb-extract-cookies.js` и вставьте в консоль
+4. Нажмите Enter — в консоль выведется JSON
+5. Скопируйте весь JSON и вставьте в панель
+
+**Способ 2 — через приложение WB Stream (Electron):**
+1. Закройте приложение WB Stream полностью
+2. Запустите его с remote debugging:
+   ```powershell
+   "C:\Program Files\WB Stream\WB Stream.exe" --remote-debugging-port=9222
+   ```
+3. Откройте Chrome и перейдите на `chrome://inspect/#devices`
+4. Найдите WB Stream и нажмите **«inspect fallback»**
+5. В открывшемся DevTools перейдите во вкладку Console
+6. Вставьте скрипт `scripts/wb-extract-cookies.js` и нажмите Enter
+7. Скопируйте полученный JSON и вставьте в панель
+
+Приложение WB Stream обычно имеет более высокий приоритет при подключении к комнатам, чем браузер — рекомендуется использовать его куки.
 
 ### Примеры запросов
 
@@ -397,6 +467,17 @@ ffmpeg -version
 # Если команда не найдена — установите ffmpeg (см. раздел выше)
 ```
 
+### Боты заходят в комнату, но аудио не воспроизводится (ARM / Orange Pi)
+
+1. Проверьте логи консоли — должны быть строки `[audio] loading file...`, `[audio] decoded PCM...`, `[audio] opus frames...`.
+2. Если логов `[audio]` нет — проверьте `ffmpeg` (см. выше).
+3. Если логи есть, но аудио не слышно — попробуйте собрать бинарник **на самом устройстве**:
+   ```bash
+   go build -o audiobot-panel ./backend/
+   ```
+   Кросс-компилированные бинарники иногда имеют проблемы со звуком на ARM-платах, особенно с `CGO_ENABLED=0`.
+4. Также проверьте, что системные часы на устройстве синхронизированы (NTP) — WebRTC чувствителен к времени.
+
 ### Ошибка «invalid token» (веб-версия)
 
 JWT-токен истекает через 24 часа. Получите новый: откройте панель в браузере и введите пароль заново.
@@ -404,8 +485,8 @@ JWT-токен истекает через 24 часа. Получите нов�
 ### Сброс всего
 
 ```bash
-rm -rf config/ data/audio/     # Linux
-rmdir /s config data\audio     # Windows
+rm -rf config/ data/          # Linux
+rmdir /s config data           # Windows
 
 # При следующем запуске будет сгенерирован новый пароль
 ```
