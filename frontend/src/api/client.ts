@@ -217,6 +217,18 @@ export async function setWBAccount(cfg: WBAccountConfig): Promise<void> {
   }
 }
 
+export async function startWBAccount(): Promise<void> {
+  const resp = await fetch(`${API_BASE}/api/wbstream/account/start`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ error: resp.statusText }));
+    throw new Error(err.error || "Start failed");
+  }
+}
+
 export async function stopWBAccount(): Promise<void> {
   const resp = await fetch(`${API_BASE}/api/wbstream/account/stop`, {
     method: "POST",

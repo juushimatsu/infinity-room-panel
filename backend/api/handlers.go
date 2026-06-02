@@ -152,7 +152,7 @@ func (s *Server) HandleRoomStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	roomID, err := s.manager.StartRoom(req.Service, req.RoomInput, req.BotCount, req.FileID, req.Loop)
+	roomID, err := s.manager.StartRoom(req.Service, req.RoomInput, req.BotCount, req.FileID, req.Loop, "")
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -369,7 +369,7 @@ func (s *Server) HandleRoomStartFromConfig(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	roomID, err := s.manager.StartRoom(cfg.Service, cfg.RoomInput, cfg.BotCount, cfg.FileID, cfg.Loop)
+	roomID, err := s.manager.StartRoom(cfg.Service, cfg.RoomInput, cfg.BotCount, cfg.FileID, cfg.Loop, req.RoomID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -415,17 +415,32 @@ func (s *Server) HandleWBAccountSet(w http.ResponseWriter, r *http.Request) {
 		req.StayDurationSec = 5
 	}
 
-	// Restart keeper with new config.
-	s.manager.StopWBAccountKeeper()
 	if err := s.accountStore.Set(req); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	if req.Enabled {
-		s.manager.RunWBAccountKeeper(&req)
-	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "saved"})
+}
+
+func (s *Server) HandleWBAccountStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if s.accountStore == nil {
+		writeError(w, http.StatusInternalServerError, "account store not available")
+		return
+	}
+
+	cfg := s.accountStore.Get()
+	s.manager.StopWBAccountKeeper()
+	s.manager.RunWBAccountKeeper(&cfg)
+
+	cfg.Enabled = true
+	s.accountStore.Set(cfg)
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "started"})
 }
 
 func (s *Server) HandleWBAccountStop(w http.ResponseWriter, r *http.Request) {
@@ -434,6 +449,13 @@ func (s *Server) HandleWBAccountStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.manager.StopWBAccountKeeper()
+
+	if s.accountStore != nil {
+		cfg := s.accountStore.Get()
+		cfg.Enabled = false
+		s.accountStore.Set(cfg)
+	}
+
 	writeJSON(w, http.StatusOK, map[string]string{"status": "stopped"})
 }
 

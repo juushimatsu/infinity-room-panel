@@ -134,22 +134,17 @@ func (m *BotManager) isRoomActive(roomInput string) bool {
 // wbJoinAndStay connects to a WB Stream room as a real user, stays for
 // the requested duration, then disconnects.  No audio is published.
 func (m *BotManager) wbJoinAndStay(ctx context.Context, roomID, token, ua string, stay time.Duration, displayName string) error {
-	// 1. Join room
-	if err := wbJoinRoomWithUA(ctx, roomID, token, ua); err != nil {
-		// If that failed, try once more using the cookie as Bearer fallback.
-		log.Printf("[wb-keeper] join room failed, retrying: %v", err)
-		if err := wbJoinRoomWithUA(ctx, roomID, token, ua); err != nil {
-			return fmt.Errorf("join room: %w", err)
-		}
-	}
-
-	// 2. Get connection details
+	// Get LiveKit connection details via WB Stream REST API.
+	// The room token already encodes the real-user identity and permissions,
+	// so WB Stream tracks this participant through LiveKit events alone.
 	connDetails, err := wbGetConnectionDetailsWithUA(ctx, roomID, token, displayName, ua)
 	if err != nil {
 		return fmt.Errorf("connection details: %w", err)
 	}
 
-	// 3. Connect to LiveKit
+	// Connect to LiveKit only.  Skip the separate WB Stream REST API join
+	// to avoid a two-system participant record that can get out of sync
+	// and create a ghost user that disrupts room routing.
 	roomCallback := &lksdk.RoomCallback{}
 	room := lksdk.NewRoom(roomCallback)
 	defer room.Disconnect()
@@ -160,7 +155,7 @@ func (m *BotManager) wbJoinAndStay(ctx context.Context, roomID, token, ua string
 
 	log.Printf("[wb-keeper] connected to %s, staying %v", roomID, stay)
 
-	// 4. Just stay — no track published.
+	// Just stay — no track published.
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

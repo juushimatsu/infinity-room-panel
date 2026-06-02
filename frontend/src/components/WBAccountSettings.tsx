@@ -3,6 +3,7 @@ import {
   WBAccountConfig,
   getWBAccount,
   setWBAccount,
+  startWBAccount,
   stopWBAccount,
 } from "../api/client";
 
@@ -24,6 +25,7 @@ function WBAccountSettings({ onClose }: WBAccountSettingsProps) {
   const [dumpError, setDumpError] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [starting, setStarting] = useState(false);
 
   useEffect(() => {
     getWBAccount()
@@ -103,7 +105,6 @@ function WBAccountSettings({ onClose }: WBAccountSettingsProps) {
     try {
       await setWBAccount(cfg);
       alert("Сохранено");
-      onClose();
     } catch (e: any) {
       alert(e.message || "Ошибка сохранения");
     } finally {
@@ -111,10 +112,32 @@ function WBAccountSettings({ onClose }: WBAccountSettingsProps) {
     }
   };
 
+  const handleStart = async () => {
+    setStarting(true);
+    try {
+      await startWBAccount();
+      setCfg((prev) => ({ ...prev, enabled: true }));
+      alert("Бот запущен");
+    } catch (e: any) {
+      alert(e.message || "Ошибка запуска");
+    } finally {
+      setStarting(false);
+    }
+  };
+
   const handleStopNow = async () => {
     try {
       await stopWBAccount();
-      setCfg((prev) => ({ ...prev, enabled: false }));
+      const data = await getWBAccount();
+      setCfg({
+        enabled: data.enabled ?? false,
+        cookies: data.cookies ?? "",
+        access_token: data.access_token ?? "",
+        user_agent: data.user_agent ?? "",
+        display_name: data.display_name ?? "",
+        interval_sec: data.interval_sec ?? 300,
+        stay_duration_sec: data.stay_duration_sec ?? 5,
+      });
       alert("Бот остановлен");
     } catch (e: any) {
       alert(e.message || "Ошибка остановки");
@@ -328,9 +351,16 @@ function WBAccountSettings({ onClose }: WBAccountSettingsProps) {
           {saving ? "Сохранение..." : "Сохранить"}
         </button>
         <button
+          className="btn btn-primary"
+          onClick={handleStart}
+          disabled={starting}
+          type="button"
+        >
+          {starting ? "Запуск..." : "Запустить"}
+        </button>
+        <button
           className="btn btn-secondary"
           onClick={handleStopNow}
-          disabled={!cfg.enabled}
           type="button"
         >
           Остановить сейчас

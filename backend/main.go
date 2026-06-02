@@ -195,6 +195,7 @@ func main() {
 	apiRouter.HandleFunc("/room/status", server.HandleSessionStatusWS).Methods("GET")
 	apiRouter.HandleFunc("/wbstream/account", server.HandleWBAccountGet).Methods("GET")
 	apiRouter.HandleFunc("/wbstream/account", server.HandleWBAccountSet).Methods("POST")
+	apiRouter.HandleFunc("/wbstream/account/start", server.HandleWBAccountStart).Methods("POST")
 	apiRouter.HandleFunc("/wbstream/account/stop", server.HandleWBAccountStop).Methods("POST")
 
 	// Auth endpoints (outside apiRouter to skip auth middleware)

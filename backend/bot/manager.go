@@ -93,7 +93,7 @@ func NewBotManager(stor AudioStorage, cfgStore *storage.RoomConfigStore) *BotMan
 
 // StartRoom creates a new room session and starts bots.
 // Returns the room ID.
-func (m *BotManager) StartRoom(service, roomInput string, botCount int, fileID string, loop bool) (string, error) {
+func (m *BotManager) StartRoom(service, roomInput string, botCount int, fileID string, loop bool, roomID string) (string, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -111,8 +111,10 @@ func (m *BotManager) StartRoom(service, roomInput string, botCount int, fileID s
 		return "", fmt.Errorf("load audio: %w", err)
 	}
 
-	m.nextRoomID++
-	roomID := fmt.Sprintf("room_%d", m.nextRoomID)
+	if roomID == "" {
+		m.nextRoomID++
+		roomID = fmt.Sprintf("room_%d", m.nextRoomID)
+	}
 
 	room := &Room{
 		ID:         roomID,
@@ -212,7 +214,7 @@ func (m *BotManager) RestartRoom(roomID string) error {
 	if !ok {
 		return fmt.Errorf("room config not found: %s", roomID)
 	}
-	_, err := m.StartRoom(cfg.Service, cfg.RoomInput, cfg.BotCount, cfg.FileID, cfg.Loop)
+	_, err := m.StartRoom(cfg.Service, cfg.RoomInput, cfg.BotCount, cfg.FileID, cfg.Loop, roomID)
 	return err
 }
 
@@ -242,7 +244,7 @@ func (m *BotManager) UpdateRoomConfig(roomID, service, roomInput string, botCoun
 	}
 
 	if active {
-		_, err := m.StartRoom(service, roomInput, botCount, fileID, loop)
+		_, err := m.StartRoom(service, roomInput, botCount, fileID, loop, roomID)
 		return err
 	}
 	return nil
